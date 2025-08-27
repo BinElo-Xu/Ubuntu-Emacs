@@ -1,6 +1,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 1. BASIC UI TWEAKS
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; You will most likely need to adjust this font size for your system!
+(defvar runemacs/default-font-size 180)
 
 (setq inhibit-startup-message t)
 
@@ -12,7 +14,20 @@
 
 (setq visible-bell t)
 
-(set-face-attribute 'default nil :font "FiraCode Nerd Font" :height 180)
+;; Font Configuration ----------------------------------------------------------
+
+(set-face-attribute 'default nil :font "Fira Code Retina" :height runemacs/default-font-size)
+
+;; Set the fixed pitch face
+(set-face-attribute 'fixed-pitch nil :font "Fira Code Retina" :height 180)
+
+;; Set the variable pitch face
+(set-face-attribute 'variable-pitch nil :font "Cantarell" :height 195 :weight 'regular)
+
+;; Set the chinese fronts
+(set-fontset-font t 'han (font-spec :family "LXGW WenKai") nil 'prepend)
+
+;; Package Manager Configuration -----------------------------------------------
 
 (global-set-key (kbd "<escape>") 'keyboard-escape-quit)
 
@@ -188,6 +203,32 @@
   :custom
   (magit-display-buffer-function #'magit-display-buffer-same-window-except-diff-v1))
 
+(defun efs/org-mode-setup ()
+  (org-indent-mode)
+  (variable-pitch-mode 1)
+  (visual-line-mode 1))
+
+(defun efs/org-font-setup ()
+  (set-face-attribute 'org-block nil :foreground nil :inherit 'fixed-pitch)
+  (set-face-attribute 'org-code nil   :inherit '(shadow fixed-pitch))
+  (set-face-attribute 'org-table nil   :inherit '(shadow fixed-pitch))
+  (set-face-attribute 'org-verbatim nil :inherit '(shadow fixed-pitch))
+  (set-face-attribute 'org-special-keyword nil :inherit '(font-lock-comment-face fixed-pitch))
+  (set-face-attribute 'org-meta-line nil :inherit '(font-lock-comment-face fixed-pitch))
+  (set-face-attribute 'org-checkbox nil :inherit 'fixed-pitch))
+
+(use-package org
+  :hook (org-mode . efs/org-mode-setup)
+  :config
+  (setq org-ellipsis " ▾")
+  (efs/org-font-setup))
+
+(use-package org-modern
+  :ensure t
+  :hook (org-mode . org-modern-mode))
+
+(use-package mixed-pitch
+  :ensure t)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 4. CUSTOM SECTION (Keep this at the end)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -203,7 +244,7 @@
  '(custom-safe-themes
    '("bffa708323223011c750567c2d53a2070085188f63561a0f5a549d10b7593c17" default))
  '(package-selected-packages
-   '(evil-magit magit counsel-projectile projectile hydra evil-collection evil general all-the-icons doom-themes helpful ivy-rich which-key doom-modeline counsel ivy)))
+   '(olivetti mixed-pitch org-superstar org-modern evil-magit magit counsel-projectile projectile hydra evil-collection evil general all-the-icons doom-themes helpful ivy-rich which-key doom-modeline counsel ivy)))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
