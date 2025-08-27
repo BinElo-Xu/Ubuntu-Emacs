@@ -203,32 +203,81 @@
   :custom
   (magit-display-buffer-function #'magit-display-buffer-same-window-except-diff-v1))
 
-(defun efs/org-mode-setup ()
-  (org-indent-mode)
-  (variable-pitch-mode 1)
-  (visual-line-mode 1))
-
-(defun efs/org-font-setup ()
-  (set-face-attribute 'org-block nil :foreground nil :inherit 'fixed-pitch)
-  (set-face-attribute 'org-code nil   :inherit '(shadow fixed-pitch))
-  (set-face-attribute 'org-table nil   :inherit '(shadow fixed-pitch))
-  (set-face-attribute 'org-verbatim nil :inherit '(shadow fixed-pitch))
-  (set-face-attribute 'org-special-keyword nil :inherit '(font-lock-comment-face fixed-pitch))
-  (set-face-attribute 'org-meta-line nil :inherit '(font-lock-comment-face fixed-pitch))
-  (set-face-attribute 'org-checkbox nil :inherit 'fixed-pitch))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; ORG MODE CONFIGURATION
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (use-package org
-  :hook (org-mode . efs/org-mode-setup)
+  :defer t ;; Defer loading until org-mode is actually used
   :config
-  (setq org-ellipsis " ▾")
+  (setq org-ellipsis " ▾"
+        ;; 让 Startup 中 DONE 的条目也折叠起来
+        org-startup-folded 'content
+        ;; 改进 org-indent-mode 的视觉效果
+        org-src-preserve-indentation t
+        org-startup-indented t
+        org-pretty-entities t
+        org-hide-emphasis-markers t)
+
+  ;; --- 自定义字体设置 ---
+  ;; 这个函数确保代码块、表格等使用等宽字体
+  (defun efs/org-font-setup ()
+    (set-face-attribute 'org-block nil :foreground nil :inherit 'fixed-pitch)
+    (set-face-attribute 'org-code nil   :inherit '(shadow fixed-pitch))
+    (set-face-attribute 'org-table nil   :inherit '(shadow fixed-pitch))
+    (set-face-attribute 'org-verbatim nil :inherit '(shadow fixed-pitch))
+    (set-face-attribute 'org-special-keyword nil :inherit '(font-lock-comment-face fixed-pitch))
+    (set-face-attribute 'org-meta-line nil :inherit '(font-lock-comment-face fixed-pitch))
+    (set-face-attribute 'org-checkbox nil :inherit 'fixed-pitch))
+
+  ;; 调用字体设置
   (efs/org-font-setup))
 
 (use-package org-modern
   :ensure t
-  :hook (org-mode . org-modern-mode))
+  :after org
+  :config
+  ;; --- 自定义 org-modern 的外观 ---
+  ;; 这是美化列表的核心！你可以从 'unicode, 'fancy, 'default 中选择
+  (setq org-modern-list-bulleteer-styles
+        '((?* . "•")
+          (?+ . "–")
+          (?- . "·")))
+  
+  ;; 美化 checklist 方框
+  ;; 你可以换成其他喜欢的 Unicode 字符，比如 ("✔" "☐" "–")
+  (setq org-modern-checkbox-character '("✓" "☐" "—"))
 
+  ;; 美化标题
+  (setq org-modern-headline-bullets
+        '((:default . "›")
+          (1 . "◉")
+          (2 . "○")
+          (3 . "●"))))
+
+;; --- 最终的 Org Mode 钩子 ---
+;; 这个函数会在每次打开 .org 文件时运行
+(defun my-final-org-mode-setup ()
+  (org-indent-mode)
+  (variable-pitch-mode 1)
+  (visual-line-mode 1) ; 自动换行
+  (org-modern-mode 1))  ; 确保 org-modern 最后启用
+
+(add-hook 'org-mode-hook #'my-final-org-mode-setup)
+
+;; mixed-pitch 是 variable-pitch-mode 的好搭档，确保它已安装
 (use-package mixed-pitch
-  :ensure t)
+  :ensure t
+  :hook (org-mode . mixed-pitch-mode))
+
+;; (可选) 添加 olivetti-mode 来获得更专注的写作体验
+(use-package olivetti
+  :ensure t
+  :hook (org-mode . olivetti-mode)
+  :config
+  (setq olivetti-body-width 100)
+  (setq olivetti-enable-in-agenda-buffers nil))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; 4. CUSTOM SECTION (Keep this at the end)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
