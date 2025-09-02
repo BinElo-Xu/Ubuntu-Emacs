@@ -1,3 +1,14 @@
+#+title: Emacs configuration
+
+* Checkout the repo for emacs configuration
+
+* Package System Setup
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle ./init.el
+:END:
+
+#+begin_src emacs-lisp
+
 (require 'package)
 (setq package-archives '(("melpa" . "https://melpa.org/packages/")
                          ("org" . "https://orgmode.org/elpa/")
@@ -12,6 +23,15 @@
 
 (require 'use-package)
 (setq use-package-always-ensure t)
+
+#+end_src
+
+* Keybinding Configuration
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle ./init.el
+:END:
+
+#+begin_src emacs-lisp
 
 (global-set-key (kbd "<escape>") 'keyboard-escape-quit)
 
@@ -47,6 +67,14 @@
   :config
   (evil-collection-init))
 
+#+end_src
+* Basic UI configuration
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle ./init.el
+:END:
+
+#+begin_src emacs-lisp
+
   ;; You will most likely need to adjust this font size for your system!
   (defvar runemacs/default-font-size 180)
 
@@ -71,6 +99,12 @@
 
   (load-theme 'wombat t)
 
+#+end_src
+
+** Font configuration
+
+#+begin_src emacs-lisp
+
 (set-face-attribute 'default nil :font "Fira Code Retina" :height runemacs/default-font-size)
 
 ;; Set the fixed pitch face
@@ -81,6 +115,17 @@
 
 ;; Set the chinese fronts
 (set-fontset-font t 'han (font-spec :family "LXGW WenKai") nil 'prepend)
+
+#+end_src
+
+* UI Configuration
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle ./init.el
+:END:
+
+** ivy and consel
+
+#+begin_src emacs-lisp
 
 (use-package ivy
   :diminish ivy-mode
@@ -136,7 +181,11 @@
 	 ("C-r" . 'counsel-minibuffer-history))
   :config
   (setq ivy-initial-inputs-alist nil)) ;; Don't start searches with ^
+#+end_src
 
+** helpful
+
+#+begin_src emacs-lisp
 (use-package helpful
   :commands (helpful-callable helpful-variable helpful-command helpful-key)
   :custom
@@ -148,6 +197,12 @@
   ([remap describe-variable] . counsel-describe-variable)
   ([remap describe-key] . helpful-key))
 
+#+end_src
+
+** Text Scaling
+
+#+begin_src emacs-lisp
+
 (use-package hydra)
 
 (defhydra hydra-text-scale (:timeout 4)
@@ -158,6 +213,14 @@
 
 (rune/leader-keys
  "ts" '(hydra-text-scale/body :which-key "scale text"))
+
+#+end_src
+* Org mode
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle ./init.el
+:END:
+** Basic Configuration
+#+begin_src emacs-lisp
 
 (defun efs/org-font-setup ()
   (set-face-attribute 'org-block nil :foreground nil :inherit 'fixed-pitch)
@@ -260,17 +323,37 @@
   (setq olivetti-body-width 100)
   (setq olivetti-enable-in-agenda-buffers nil))
 
+#+end_src
+** Org babel
+
+*** Load babel language
+
+#+begin_src emacs-lisp
+
 (org-babel-do-load-languages
  'org-babel-load-languages
  '((emacs-lisp . t)
    (python . t)))
 
+#+end_src
+
+*** Structure templates
+
+#+begin_src emacs-lisp
 ;; This is needed for as of org 9.7
 (require 'org-tempo)
 
 (add-to-list 'org-structure-template-alist '("sh" . "src shell"))
 (add-to-list 'org-structure-template-alist '("el" . "src emacs-lisp"))
 (add-to-list 'org-structure-template-alist '("py" . "src python"))
+
+#+end_src
+
+** Auto-tangle Configuration Files
+
+This snippet adds a hook to org-mode buffers so that efs/org-babel-tangle-config gets executed each time such a buffer gets saved. This function checks to see if the file being saved is the Emacs.org file you’re looking at right now, and if so, automatically exports the configuration here to the associated output files.
+
+#+begin_src emacs-lisp
 
 ;; Automatically tangle our Emacs.org config file when we save it
 (defun efs/org-babel-tangle-config ()
@@ -281,6 +364,19 @@
       (org-babel-tangle))))
 
 (add-hook 'org-mode-hook (lambda () (add-hook 'after-save-hook #'efs/org-babel-tangle-config)))
+
+#+end_src
+
+* Development
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle ./init.el
+:END:
+
+** Languages
+
+*** IDE features with lsp-mode
+**** lsp-mode
+#+begin_src emacs-lisp
 
 (defun efs/lsp-mode-setup ()
   (setq lsp-headerline-breadcrumb-segments '(path-up-to-project file symbols))
@@ -294,15 +390,31 @@
   :config
   (lsp-enable-which-key-integration t))
 
+#+end_src
+*** lsp-ui
+#+begin_src emacs-lisp
+
 (use-package lsp-ui
   :hook (lsp-mode . lsp-ui-mode)
   :custom
   (lsp-ui-doc-position 'bottom))
 
+#+end_src
+*** lsp-treemacs
+#+begin_src emacs-lisp
+
 (use-package lsp-treemacs
   :after lsp)
 
+#+end_src
+*** lsp-ivy
+#+begin_src emacs-lisp
+
 (use-package lsp-ivy)
+
+#+end_src
+*** Company Mode
+#+begin_src emacs-lisp
 
 (use-package company
   :after lsp-mode
@@ -318,23 +430,45 @@
 (use-package company-box
   :hook (company-mode . company-box-mode))
 
+#+end_src
+** Python
+*** lsp-pyright
+由微软开发的高性能python lsp服务器
+#+begin_src emacs-lisp
 (use-package lsp-pyright
   :ensure t
   :hook (python-mode . (lambda ()
                           (require 'lsp-pyright)
                           (lsp-deferred))))
-
+#+end_src
+*** pyvenv
+“pyvenv"可以自动检测并激活根目录下的python虚拟环境
+#+begin_src emacs-lisp
 (use-package pyvenv
   :after python
   :config
   (pyvenv-mode 1))
-
+#+end_src
+*** Interactive Python
+使用ipython来作为默认的交互式python shell
+#+begin_src emacs-lisp
 (setq python-shell-interpreter "ipython"
       python-shell-interpreter-args "--simple-prompt -i")
+#+end_src
+** Java
+** C
+** C++
+** magit
 
+#+begin_src emacs-lisp
 (use-package magit
   :custom
   (magit-display-buffer-function #'magit-display-buffer-same-window-except-diff-v1))
+#+end_src
+
+** Projectile
+
+#+begin_src emacs-lisp
 
 (use-package projectile
   :diminish projectile-mode
@@ -351,11 +485,33 @@
 (use-package counsel-projectile
   :config (counsel-projectile-mode))
 
+#+end_src
+** Rainbow Delimiters
+
+#+begin_src emacs-lisp
+
 (use-package rainbow-delimiters
   :hook (prog-mode . rainbow-delimiters-mode))
 
+#+end_src
+
+* Terminals
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle ./init.el
+:END:
+
+** Better term-mode colors
+
+#+begin_src emacs-lisp
+
 (use-package eterm-256color
   :hook (term-mode . eterm-256color-mode))
+
+#+end_src
+
+** vterm
+
+#+begin_src emacs-lisp
 
 (use-package vterm
   :commands vterm
@@ -363,6 +519,12 @@
   (setq term-prompt-regexp "^[^#$%>\n]*[#$%>] *")  ;; Set this to match your custom shell prompt
   ;;(setq vterm-shell "zsh")                       ;; Set this to customize the shell to launch
   (setq vterm-max-scrollback 10000))
+
+#+end_src
+
+** Eshell
+
+#+begin_src emacs-lisp
 
 (defun efs/configure-eshell ()
   ;; Save command history when commands are entered
@@ -393,6 +555,14 @@
 
   (eshell-git-prompt-use-theme 'powerline))
 
+#+end_src
+* Custom Configuration
+:PROPERTIES:
+:header-args:emacs-lisp: :tangle ./init.el
+:END:
+
+#+begin_src emacs-lisp
+
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
@@ -408,3 +578,5 @@
  ;; Your init file should contain only one such instance.
  ;; If there is more than one, they won't work right.
  )
+
+#+end_src
