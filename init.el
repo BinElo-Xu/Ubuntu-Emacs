@@ -1,21 +1,34 @@
+;; Initialize package sources
 (require 'package)
+
 (setq package-archives '(("melpa" . "https://melpa.org/packages/")
                          ("org" . "https://orgmode.org/elpa/")
                          ("elpa" . "https://elpa.gnu.org/packages/")))
+
 (package-initialize)
-
 (unless package-archive-contents
- (package-refresh-contents))
+  (package-refresh-contents))
 
+  ;; Initialize use-package on non-Linux platforms
 (unless (package-installed-p 'use-package)
-   (package-install 'use-package))
+  (package-install 'use-package))
 
 (require 'use-package)
 (setq use-package-always-ensure t)
 
+(use-package auto-package-update
+  :custom
+  (auto-package-update-interval 7)
+  (auto-package-update-prompt-before-update t)
+  (auto-package-update-hide-results t)
+  :config
+  (auto-package-update-maybe)
+  (auto-package-update-at-time "09:00"))
+
 (global-set-key (kbd "<escape>") 'keyboard-escape-quit)
 
 (use-package general
+  :after evil
   :config
   (general-create-definer rune/leader-keys
     :keymaps '(normal insert visual emacs)
@@ -28,6 +41,7 @@
     "b" '(counsel-switch-buffer :which-key "switch buffer")))
 
 (use-package evil
+  :demand t
   :init
   (setq evil-want-integration t)
   (setq evil-want-keybinding nil)
@@ -40,7 +54,8 @@
 
   (evil-set-initial-state 'messages-buffer-mode 'normal)
   (evil-set-initial-state 'dashboard-mode 'normal)
-  (evil-set-initial-state 'org-agenda-mode 'motion))
+  (evil-set-initial-state 'org-agenda-mode 'motion)
+  (evil-set-initial-state ' calendar-mode 'motion))
 
 (use-package evil-collection
   :after evil
@@ -69,6 +84,7 @@
 		  eshell-mode-hook))
     (add-hook mode (lambda () (display-line-numbers-mode 0))))
 
+
   (load-theme 'wombat t)
 
 (set-face-attribute 'default nil :font "Fira Code Retina" :height runemacs/default-font-size)
@@ -82,7 +98,16 @@
 ;; Set the chinese fronts
 (set-fontset-font t 'han (font-spec :family "LXGW WenKai") nil 'prepend)
 
+(defun efs/org-mode-visual-fill ()
+  (setq visual-fill-column-width 110
+        visual-fill-column-center-text t)
+  (visual-fill-column-mode 1))
+
+(use-package visual-fill-column
+  :hook (org-mode . efs/org-mode-visual-fill))
+
 (use-package ivy
+  :demand t
   :diminish ivy-mode
   :bind (("C-s" . swiper)
          ("M-x" . counsel-M-x)
@@ -111,12 +136,15 @@
 
 ;; Doom Modeline
 (use-package doom-modeline
+  :demand t
   :init (doom-modeline-mode 1)
   :custom ((doom-modeline-height 15)))
 
-(use-package doom-themes)
+(use-package doom-themes
+  :demand t)
 
 (use-package which-key
+  :demand t
   :defer 0
   :diminish which-key-mode
   :config
@@ -148,7 +176,13 @@
   ([remap describe-variable] . counsel-describe-variable)
   ([remap describe-key] . helpful-key))
 
-(use-package hydra)
+(use-package hydra
+  :ensure t
+  :defer t)
+
+(use-package use-package-hydra
+  :ensure t
+  :after hydra)
 
 (defhydra hydra-text-scale (:timeout 4)
   "scale text"
@@ -237,6 +271,8 @@
           (2 . "○")
           (3 . "●"))))
 
+;; 强制在Org Mode的Normal State下将TAB绑定到org-cycle
+(evil-define-key 'normal org-mode-map (kbd "TAB") 'org-cycle)
 ;; --- 最终的 Org Mode 钩子 ---
 ;; 这个函数会在每次打开 .org 文件时运行
 (defun my-final-org-mode-setup ()
@@ -251,14 +287,6 @@
 (use-package mixed-pitch
   :ensure t
   :hook (org-mode . mixed-pitch-mode))
-
-;; (可选) 添加 olivetti-mode 来获得更专注的写作体验
-(use-package olivetti
-  :ensure t
-  :hook (org-mode . olivetti-mode)
-  :config
-  (setq olivetti-body-width 100)
-  (setq olivetti-enable-in-agenda-buffers nil))
 
 (org-babel-do-load-languages
  'org-babel-load-languages
@@ -281,6 +309,37 @@
       (org-babel-tangle))))
 
 (add-hook 'org-mode-hook (lambda () (add-hook 'after-save-hook #'efs/org-babel-tangle-config)))
+
+(use-package org-roam
+  :ensure t
+  :init
+  (setq org-roam-v2-ack t)
+  :custom
+  (org-roam-directory "~/Projects/Org/notes")
+  (org-roam-completion-everywhere t)
+    :bind (("C-c n l" . org-roam-buffer-toggle)
+         ("C-c n f" . org-roam-node-find)
+         ("C-c n i" . org-roam-node-insert)
+         :map org-mode-map
+         ("C-M-i"    . completion-at-point)
+         :map org-roam-dailies-map
+         ("Y" . org-roam-dailies-capture-yesterday)
+         ("T" . org-roam-dailies-capture-tomorrow))
+  :bind-keymap
+  ("C-c n d" . org-roam-dailies-map)
+  :config
+  (require 'org-roam-dailies) ;; Ensure the keymap is available
+  (org-roam-db-autosync-mode))
+(setq org-roam-dailies-directory "~/Projects/Org/journal")
+
+(setq org-roam-capture-templates
+   '(("d" "default" plain
+     "%?"
+     :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n")
+     :unnarrowed t)
+     ("p" "project" plain "* Goals\n\n%?\n\n* Tasks\n\n** TODO Add initial tasks\n\n* Dates\n\n"
+     :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+filetags: Project")
+     :unnarrowed t)))
 
 (defun efs/lsp-mode-setup ()
   (setq lsp-headerline-breadcrumb-segments '(path-up-to-project file symbols))
@@ -318,6 +377,13 @@
 (use-package company-box
   :hook (company-mode . company-box-mode))
 
+(use-package flycheck
+  :ensure t
+  :config
+  (setq truncate-lines nil) ; 如果单行信息很长会自动换行
+  :hook
+  (prog-mode . flycheck-mode))
+
 (use-package lsp-pyright
   :ensure t
   :hook (python-mode . (lambda ()
@@ -325,6 +391,7 @@
                           (lsp-deferred))))
 
 (use-package pyvenv
+  :demand t
   :after python
   :config
   (pyvenv-mode 1))
@@ -332,7 +399,14 @@
 (setq python-shell-interpreter "ipython"
       python-shell-interpreter-args "--simple-prompt -i")
 
+(use-package lsp-java
+  :ensure t
+  :after lsp
+  :config
+  (add-hook 'java-mode-hook #'lsp-deferred))
+
 (use-package magit
+  :defer t
   :custom
   (magit-display-buffer-function #'magit-display-buffer-same-window-except-diff-v1))
 
@@ -353,6 +427,36 @@
 
 (use-package rainbow-delimiters
   :hook (prog-mode . rainbow-delimiters-mode))
+
+(use-package dired
+  :ensure nil
+  :commands (dired dired-jump)
+  :bind (("C-x C-j" . dired-jump))
+  :custom ((dired-listing-switches "-agho --group-directories-first"))
+  :config
+  (evil-collection-define-key 'normal 'dired-mode-map
+    "h" 'dired-single-up-directory
+    "l" 'dired-single-buffer))
+
+(use-package dired-single
+  :ensure nil
+  :load-path "~/.emacs.d/lisp/")
+
+(use-package all-the-icons-dired
+  :hook (dired-mode . all-the-icons-dired-mode))
+
+(use-package dired-open
+  :config
+  ;; Doesn't work as expected!
+  ;;(add-to-list 'dired-open-functions #'dired-open-xdg t)
+  (setq dired-open-extensions '(("png" . "feh")
+                                ("mkv" . "mpv"))))
+
+(use-package dired-hide-dotfiles
+  :hook (dired-mode . dired-hide-dotfiles-mode)
+  :config
+  (evil-collection-define-key 'normal 'dired-mode-map
+    "H" 'dired-hide-dotfiles-mode))
 
 (use-package eterm-256color
   :hook (term-mode . eterm-256color-mode))
@@ -392,6 +496,44 @@
     (setq eshell-visual-commands '("htop" "zsh" "vim")))
 
   (eshell-git-prompt-use-theme 'powerline))
+
+(use-package tex
+  :ensure auctex
+  :defer t
+  :config
+  ;; 默认使用 pdfLaTeX 进行编译
+  (setq-default TeX-master nil)
+  ;; 开启 PDF 预览模式
+  (setq TeX-PDF-mode t)
+  ;; 设置默认的 PDF 查看器 (Evince 是 Ubuntu 的默认查看器)
+  (setq TeX-view-program-selection '((output-pdf "Evince")))
+  ;; 启用对中文的支持 (比如 CTeX, xeCJK 等)
+  (setq TeX-engine 'xetex) ; 推荐使用 XeTeX 引擎处理 UTF-8 和中文字体
+  (setq TeX-command-extra-options "-shell-escape")
+  ;; 让 AUCTeX 自动解析我们的 .tex 文件以提供更好的补全
+  (setq TeX-auto-save t)
+  (setq TeX-parse-self t)
+  ;; 更好的字体显示
+  (add-hook 'LaTeX-mode-hook (lambda ()
+                              (setq-local TeX-electric-sub-and-superscript t)
+                              ;; 使用更漂亮的符号显示数学公式等
+                              (TeX-source-correlate-mode)
+                              (TeX-fold-mode 1))))
+
+(use-package lsp-latex
+  :ensure t
+  :after (tex lsp-mode)
+  :hook (LaTeX-mode . lsp-deferred)) ; 当进入 LaTeX-mode 时，直接调用 lsp-deferred
+
+(use-package company-auctex
+  :ensure t
+  :after (tex company)
+  :config
+  (company-auctex-init))
+;; (可选但推荐) 将 company-auctex 添加到 company 后端
+;; 这会让 company 优先使用 auctex 提供的补全建议
+(with-eval-after-load 'company
+  (add-to-list 'company-backends '(company-auctex :with company-yasnippet)))
 
 (custom-set-variables
  ;; custom-set-variables was added by Custom.
