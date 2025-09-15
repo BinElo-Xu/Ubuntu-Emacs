@@ -98,10 +98,31 @@
 ;; Set the chinese fronts
 (set-fontset-font t 'han (font-spec :family "LXGW WenKai") nil 'prepend)
 
+(defun efs/auto-harden-visual-wrap-behind-point ()
+  "After a command, check if a visual line break occurred just before
+the current line and, if so, make it a hard newline.
+This is designed to be a fast, lightweight function for `post-command-hook`."
+  ;; This `when` is a fast check. If the mode isn't on, do nothing.
+  (when visual-fill-column-mode
+    ;; We operate without moving the user's point.
+    (save-excursion
+      ;; Move to the beginning of the current visual line, then up to the previous visual line.
+      ;; This is where the soft wrap would have just been created by typing.
+      (when (zerop (line-move-visual -1))
+        ;; `line-move-visual` returns 0 on success.
+        ;; Now, go to the end of *that* visual line (the one we just moved to).
+        (end-of-visual-line)
+        ;; If we are not at the end of the buffer and the character ahead
+        ;; is not a newline, it means we found a soft wrap.
+        (unless (or (eobp) (looking-at-p "\n"))
+          ;; Insert a real newline to "harden" the wrap.
+          (insert "\n"))))))
+
 (defun efs/org-mode-visual-fill ()
   (setq visual-fill-column-width 110
         visual-fill-column-center-text t)
-  (visual-fill-column-mode 1))
+  (visual-fill-column-mode 1)
+  (add-hook 'post-command-hook #'efs/auto-harden-visual-wrap-behind-point nil t))
 
 (use-package visual-fill-column
   :hook (org-mode . efs/org-mode-visual-fill))
@@ -315,7 +336,7 @@
   :init
   (setq org-roam-v2-ack t)
   :custom
-  (org-roam-directory "~/Projects/Org/notes")
+  (org-roam-directory "~/Projects/Org")
   (org-roam-completion-everywhere t)
     :bind (("C-c n l" . org-roam-buffer-toggle)
          ("C-c n f" . org-roam-node-find)
@@ -394,16 +415,11 @@
   :demand t
   :after python
   :config
+  (setenv "WORKON_HOME" (expand-file-name "~/miniconda3/envs"))
   (pyvenv-mode 1))
 
 (setq python-shell-interpreter "ipython"
       python-shell-interpreter-args "--simple-prompt -i")
-
-(use-package lsp-java
-  :ensure t
-  :after lsp
-  :config
-  (add-hook 'java-mode-hook #'lsp-deferred))
 
 (use-package magit
   :defer t
