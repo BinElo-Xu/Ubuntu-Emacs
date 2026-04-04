@@ -81,7 +81,8 @@
   (dolist (mode '(org-mode-hook
 		  term-mode-hook
 		  treemacs-mode-hook
-		  eshell-mode-hook))
+		  eshell-mode-hook
+		  vterm-mode-hook))
     (add-hook mode (lambda () (display-line-numbers-mode 0))))
 
 
@@ -98,31 +99,10 @@
 ;; Set the chinese fronts
 (set-fontset-font t 'han (font-spec :family "LXGW WenKai") nil 'prepend)
 
-(defun efs/auto-harden-visual-wrap-behind-point ()
-  "After a command, check if a visual line break occurred just before
-the current line and, if so, make it a hard newline.
-This is designed to be a fast, lightweight function for `post-command-hook`."
-  ;; This `when` is a fast check. If the mode isn't on, do nothing.
-  (when visual-fill-column-mode
-    ;; We operate without moving the user's point.
-    (save-excursion
-      ;; Move to the beginning of the current visual line, then up to the previous visual line.
-      ;; This is where the soft wrap would have just been created by typing.
-      (when (zerop (line-move-visual -1))
-        ;; `line-move-visual` returns 0 on success.
-        ;; Now, go to the end of *that* visual line (the one we just moved to).
-        (end-of-visual-line)
-        ;; If we are not at the end of the buffer and the character ahead
-        ;; is not a newline, it means we found a soft wrap.
-        (unless (or (eobp) (looking-at-p "\n"))
-          ;; Insert a real newline to "harden" the wrap.
-          (insert "\n"))))))
-
 (defun efs/org-mode-visual-fill ()
   (setq visual-fill-column-width 110
         visual-fill-column-center-text t)
-  (visual-fill-column-mode 1)
-  (add-hook 'post-command-hook #'efs/auto-harden-visual-wrap-behind-point nil t))
+  (visual-fill-column-mode 1))
 
 (use-package visual-fill-column
   :hook (org-mode . efs/org-mode-visual-fill))
@@ -241,8 +221,8 @@ This is designed to be a fast, lightweight function for `post-command-hook`."
   (setq org-hide-emphasis-markers t)
 
   ;; Set org-agenda
-  (setq org-agenda-files '("~/Projects/Org/agenda/Habit.org"
-                           "~/Projects/Org/agenda/Inbox.org"
+  (setq org-agenda-files '("~/Projects/Notes/agenda/habbites.org"
+                           "~/Projects/Notes/agenda/inbox.org"
 			   ))
 
   (require 'org-habit)
@@ -260,9 +240,9 @@ This is designed to be a fast, lightweight function for `post-command-hook`."
   (advice-add 'org-refile :after 'org-save-all-org-buffers)
   ;; Set capture-templates
   (setq org-capture-templates
-	`(("i" "Ideas" entry (file+olp"~/Projects/Org/agenda/Inbox.org" "Idea")
+	`(("i" "Ideas" entry (file+olp"~/Projects/Notes/agenda/inbox.org" "Idea")
 	   "** %?\n \n %a")
-	  ("t" "Todo" entry (file+olp"~/Projects/Org/agenda/Inbox.org" "Todo")
+	  ("t" "Todo" entry (file+olp"~/Projects/Notes/agenda/inbox.org" "Todo")
 	   "** TODO %?\n \n %a")
 	  ))
 
@@ -336,7 +316,7 @@ This is designed to be a fast, lightweight function for `post-command-hook`."
   :init
   (setq org-roam-v2-ack t)
   :custom
-  (org-roam-directory "~/Projects/Org")
+  (org-roam-directory "~/Projects/Notes/notes")
   (org-roam-completion-everywhere t)
     :bind (("C-c n l" . org-roam-buffer-toggle)
          ("C-c n f" . org-roam-node-find)
@@ -351,7 +331,7 @@ This is designed to be a fast, lightweight function for `post-command-hook`."
   :config
   (require 'org-roam-dailies) ;; Ensure the keymap is available
   (org-roam-db-autosync-mode))
-(setq org-roam-dailies-directory "~/Projects/Org/journal")
+(setq org-roam-dailies-directory "~/Projects/Notes/journal")
 
 (setq org-roam-capture-templates
    '(("d" "default" plain
@@ -360,27 +340,51 @@ This is designed to be a fast, lightweight function for `post-command-hook`."
      :unnarrowed t)
      ("p" "project" plain "* Goals\n\n%?\n\n* Tasks\n\n** TODO Add initial tasks\n\n* Dates\n\n"
      :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+filetags: Project")
+     :unnarrowed t)
+     ("r" "resource" plain "* Summery\n\n%?\n\n* Main Content\n\n"
+     :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+filetags: Resource")
      :unnarrowed t)))
+
+(electric-pair-mode 1)
 
 (defun efs/lsp-mode-setup ()
   (setq lsp-headerline-breadcrumb-segments '(path-up-to-project file symbols))
-  (lsp-headerline-breadcrumb-mode))
+  (lsp-headerline-breadcrumb-mode 1))
 
 (use-package lsp-mode
   :commands (lsp lsp-deferred)
-  :hook (lsp-mode . efs/lsp-mode-setup)
+  :hook
+  (lsp-mode . efs/lsp-mode-setup)
   :init
   (setq lsp-keymap-prefix "C-c l")  ;; Or 'C-l', 's-l'
   :config
-  (lsp-enable-which-key-integration t))
+  (lsp-enable-which-key-integration t)
+  (setq lsp-enable-snippet nil)
+  (setq lsp-enable-on-type-formatting nil)
+  (setq lsp-enable-indentation nil))
 
 (use-package lsp-ui
   :hook (lsp-mode . lsp-ui-mode)
   :custom
   (lsp-ui-doc-position 'bottom))
 
-(use-package lsp-treemacs
-  :after lsp)
+;; Great UI for project management.
+(use-package treemacs
+  :defer t
+  :config
+  (setq treemacs-follow-after-init t
+        treemacs-is-never-other-window t)
+  :bind
+  (:map global-map
+        ("M-0"       . treemacs-select-window)
+        ("C-x t t"   . treemacs)))
+;; coorperation with projectile.
+(use-package treemacs-projectile
+  :after (treemacs projectile))
+
+;; Auto change the treemacs directory when change the project.
+(use-package treemacs-evil
+  :after (treemacs evil))
 
 (use-package lsp-ivy)
 
@@ -388,12 +392,13 @@ This is designed to be a fast, lightweight function for `post-command-hook`."
   :after lsp-mode
   :hook (lsp-mode . company-mode)
   :bind (:map company-active-map
-         ("<tab>" . company-complete-selection))
-        (:map lsp-mode-map
-         ("<tab>" . company-indent-or-complete-common))
+              ("<tab>" . company-complete-selection)
+	            ("TAB" . company-complete-selection))
+  (:map lsp-mode-map
+        ("<tab>" . company-indent-or-complete-common))
   :custom
   (company-minimum-prefix-length 1)
-  (company-idle-delay 0.0))
+  (company-idle-delay 0.1))
 
 (use-package company-box
   :hook (company-mode . company-box-mode))
@@ -405,21 +410,20 @@ This is designed to be a fast, lightweight function for `post-command-hook`."
   :hook
   (prog-mode . flycheck-mode))
 
-(use-package lsp-pyright
-  :ensure t
-  :hook (python-mode . (lambda ()
-                          (require 'lsp-pyright)
-                          (lsp-deferred))))
+;; avy search tool
+(use-package avy
+  :bind
+  (("M-s" . avy-goto-char-timer))
+  )
 
-(use-package pyvenv
-  :demand t
-  :after python
+(use-package cc-mode
+  :ensure nil
+  :init
+  (add-hook 'c-mode-hook 'lsp-deferred)
+  (add-hook 'c++-mode-hook 'lsp-deferred)
   :config
-  (setenv "WORKON_HOME" (expand-file-name "~/miniconda3/envs"))
-  (pyvenv-mode 1))
-
-(setq python-shell-interpreter "ipython"
-      python-shell-interpreter-args "--simple-prompt -i")
+  (setq c-default-style "k&r")
+  (setq-default c-basic-offset 4))
 
 (use-package magit
   :defer t
