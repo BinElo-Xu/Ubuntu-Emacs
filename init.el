@@ -206,8 +206,13 @@
 (use-package org
   :defer t ;; Defer loading until org-mode is actually used
   :bind (("C-c a" . org-agenda)
-	     ("C-c c" . org-capture))
+	 ("C-c c" . org-capture)
+	 ("C-c t" . (lambda () (interactive) (find-file "~/Projects/Notes/agenda/todo.org")))
+	 ("C-c s l" . org-store-link)
+	 )
   :config
+  (setq org-startup-with-inline-images nil) ;; Set this to nil for better look and performace.
+  (setq org-image-actual-width nil) ;; Set to nil for allowing operate image.
   (setq org-agenda-start-with-log-mode t)
   (setq org-log-done 'time)
   (setq org-log-into-drawer t)
@@ -221,9 +226,8 @@
   (setq org-hide-emphasis-markers t)
 
   ;; Set org-agenda
-  (setq org-agenda-files '("~/Projects/Notes/agenda/habbites.org"
-                           "~/Projects/Notes/agenda/inbox.org"
-			   ))
+  (setq org-agenda-files '("~/Projects/Notes/agenda/inbox.org"
+   		       "~/Projects/Notes/agenda/todo.org"))
 
   (require 'org-habit)
   (add-to-list 'org-modules 'org-habit)
@@ -240,9 +244,9 @@
   (advice-add 'org-refile :after 'org-save-all-org-buffers)
   ;; Set capture-templates
   (setq org-capture-templates
-	`(("i" "Ideas" entry (file+olp"~/Projects/Notes/agenda/inbox.org" "Idea")
+	`(("i" "ideas" entry (file+olp"~/Projects/Notes/agenda/idea.org" "idea lists")
 	   "** %?\n \n %a")
-	  ("t" "Todo" entry (file+olp"~/Projects/Notes/agenda/inbox.org" "Todo")
+	  ("I" "Inbox" entry (file+olp"~/Projects/Notes/agenda/inbox.org" "Captures")
 	   "** TODO %?\n \n %a")
 	  ))
 
@@ -333,6 +337,60 @@
   (org-roam-db-autosync-mode))
 (setq org-roam-dailies-directory "~/Projects/Notes/journal")
 
+(use-package org-download
+  :ensure t
+  :after org
+  :bind
+  (("C-c g" . org-download-clipboard))
+  :config
+  ;; Auto inserting the #+ATTR_ORG tag to control inserted images
+  ;; Set defaulte width is 400, when output to html file, the width is 80%,
+  ;; and align center.
+  (setq org-download-image-attr-list
+        '("#+ATTR_ORG: :width 400"
+          "#+ATTR_HTML: :width 80% :align center"))
+  
+;; Insert annotationg automatically.
+  (setq org-download-annotate-function
+        (lambda (_link)
+          (let ((caption (read-string "Please input the title of image(Press <Enter> if NULL): ")))
+            (if (string-empty-p caption)
+                ""                       ;; Do not insert anything if NULL.
+              (format "#+CAPTION: %s\n" caption))))) ;; Auto insert if has inputs CAPTION
+
+  ;; The format of insert image.
+  (setq org-download-link-format
+	"#+begin_center\n[[file:%s]]\n#+end_center\n")
+
+  ;; Set directory where the image store to. 
+  (defun my-org-download-set-dir ()
+    "Set `org-download-image-dir` to the directory of the current buffer's file."
+    ;; 加入 when 判断，只有在 (buffer-file-name) 不为空时才执行
+    (when (buffer-file-name)
+      (setq-local org-download-image-dir 
+                  (concat (file-name-directory (buffer-file-name)) 
+                          "images/" 
+                          (file-name-base (buffer-file-name)) "/"))))
+  
+  (setq org-download-timestamp "%Y%m%d-%H%M%S_")
+  (setq org-download-method 'directory)
+  (setq org-download-heading-lvl nil)
+  ;; 2. 【核心修复】：临时拦截并屏蔽 org-id-get-create 的执行
+  (defun my-org-download-disable-id (orig-fn &rest args)
+    (cl-letf (((symbol-function 'org-id-get-create) #'ignore))
+      (apply orig-fn args)))
+  
+  ;; 把拦截器挂载到 org-download 的几个触发函数上
+  (advice-add 'org-download-clipboard :around #'my-org-download-disable-id)
+  (advice-add 'org-download-screenshot :around #'my-org-download-disable-id)
+  (advice-add 'org-download-yank :around #'my-org-download-disable-id)
+
+  ;; 3. 关掉图片上方那行烦人的 "DOWNLOADED: screenshot @ ..." 注释
+  (setq org-download-annotate-function (lambda (_link) ""))
+  
+  :hook
+  ((org-mode . my-org-download-set-dir)))
+
 (setq org-roam-capture-templates
    '(("d" "default" plain
      "%?"
@@ -341,7 +399,7 @@
      ("p" "project" plain "* Goals\n\n%?\n\n* Tasks\n\n** TODO Add initial tasks\n\n* Dates\n\n"
      :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+filetags: Project")
      :unnarrowed t)
-     ("r" "resource" plain "* Summery\n\n%?\n\n* Main Content\n\n"
+     ("r" "resource" plain "* Main\n%?\n"
      :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+filetags: Resource")
      :unnarrowed t)))
 
@@ -386,7 +444,9 @@
 (use-package treemacs-evil
   :after (treemacs evil))
 
-(use-package lsp-ivy)
+(use-package lsp-ivy
+  :after (lsp-mode ivy)
+  :defer t)
 
 (use-package company
   :after lsp-mode
@@ -454,7 +514,7 @@
   :bind (("C-x C-j" . dired-jump))
   :custom ((dired-listing-switches "-agho --group-directories-first"))
   :config
-  (evil-collection-define-key 'normal 'dired-mode-map
+  (evil-collection-define-key '(normal) 'dired-mode-map
     "h" 'dired-single-up-directory
     "l" 'dired-single-buffer))
 
@@ -475,7 +535,7 @@
 (use-package dired-hide-dotfiles
   :hook (dired-mode . dired-hide-dotfiles-mode)
   :config
-  (evil-collection-define-key 'normal 'dired-mode-map
+  (evil-collection-define-key '(normal) 'dired-mode-map
     "H" 'dired-hide-dotfiles-mode))
 
 (use-package eterm-256color
