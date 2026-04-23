@@ -211,7 +211,7 @@
 	 ("C-c s l" . org-store-link)
 	 )
   :config
-  (setq org-startup-with-inline-images nil) ;; Set this to nil for better look and performace.
+  (setq org-startup-with-inline-images -1) ;; Set this to nil for better look and performace.
   (setq org-image-actual-width nil) ;; Set to nil for allowing operate image.
   (setq org-agenda-start-with-log-mode t)
   (setq org-log-done 'time)
@@ -227,11 +227,17 @@
 
   ;; Set org-agenda
   (setq org-agenda-files '("~/Projects/Notes/agenda/inbox.org"
-   		       "~/Projects/Notes/agenda/todo.org"))
+  			   "~/Projects/Notes/agenda/todo.org"
+			   "~/Projects/Notes/agenda/habbits.org"))
 
   (require 'org-habit)
   (add-to-list 'org-modules 'org-habit)
   (setq org-habit-graph-column 60)
+  ;; 清理 Agenda 和 TODO 面板中的重复项与未来习惯
+  (setq org-agenda-todo-ignore-scheduled 'future)           ;; TODO列表隐藏未来才需要做的任务
+  (setq org-agenda-todo-ignore-deadlines 'near)             ;; TODO列表隐藏近期截止的重复任务
+  (setq org-agenda-show-future-repeats nil)                 ;; 不在日程中铺满未来的所有重复项
+  (setq org-habit-show-habits-only-for-today t)             ;; 习惯只在今天显示
 
   (setq org-todo-keywords
 	'((sequence "TODO(t)" "NEXT(n)" "|" "DONE(d!)")))
