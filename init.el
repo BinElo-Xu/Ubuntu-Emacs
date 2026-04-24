@@ -226,8 +226,8 @@
   (setq org-hide-emphasis-markers t)
 
   ;; Set org-agenda
-  (setq org-agenda-files '("~/Projects/Notes/agenda/inbox.org"
-  			   "~/Projects/Notes/agenda/todo.org"
+  (setq org-agenda-files '(
+			   "~/Projects/Notes/agenda/todo.org"
 			   "~/Projects/Notes/agenda/habbits.org"))
 
   (require 'org-habit)
@@ -238,7 +238,13 @@
   (setq org-agenda-todo-ignore-deadlines 'near)             ;; TODO列表隐藏近期截止的重复任务
   (setq org-agenda-show-future-repeats nil)                 ;; 不在日程中铺满未来的所有重复项
   (setq org-habit-show-habits-only-for-today t)             ;; 习惯只在今天显示
-
+  ;; 使用 add-to-list 安全追加，绝对不会覆盖你原来的 n 选项！
+  (add-to-list 'org-agenda-custom-commands
+               '("i" "List all todo entries in Inbox." alltodo ""
+                 ;; 这个神奇的设置会让按下 i 时，Agenda 临时只去读取 inbox.org
+                 ((org-agenda-files '("~/Projects/Notes/agenda/inbox.org"))))
+               t) ;; 最后的 t 表示追加到列表末尾
+  
   (setq org-todo-keywords
 	'((sequence "TODO(t)" "NEXT(n)" "|" "DONE(d!)")))
 
