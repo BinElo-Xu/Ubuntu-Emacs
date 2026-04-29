@@ -12,8 +12,8 @@
 (require 'package)
 
 (setq package-archives '(("melpa" . "https://melpa.org/packages/")
-                         ("org" . "https://orgmode.org/elpa/")
-                         ("elpa" . "https://elpa.gnu.org/packages/")))
+                         ("elpa" . "https://elpa.gnu.org/packages/")
+                         ("nongnu" . "https://elpa.nongnu.org/nongnu/")))
 
 (package-initialize)
 (unless package-archive-contents
@@ -124,7 +124,7 @@ Its repo there: https://github.com/rranelli/auto-package-update.el
     (add-hook mode (lambda () (display-line-numbers-mode 0))))
 
 
-  (load-theme 'wombat t)
+  (load-theme 'modus-vivendi t)
 
 #+end_src
 
@@ -336,7 +336,7 @@ Its repo there: https://github.com/rranelli/auto-package-update.el
   (setq org-capture-templates
 	`(("i" "ideas" entry (file+olp"~/Projects/Notes/agenda/idea.org" "idea lists")
 	   "** %?\n \n %a")
-	  ("I" "Inbox" entry (file+olp"~/Projects/Notes/agenda/inbox.org" "Captures")
+	  ("f" "Fleeting notes" entry (file+olp"~/Projects/Notes/agenda/inbox.org" "Captures")
 	   "** TODO %?\n \n %a")
 	  ))
 
@@ -440,7 +440,7 @@ suitable for （卡片笔记法）
   :custom
   (org-roam-directory "~/Projects/Notes/notes")
   (org-roam-completion-everywhere t)
-    :bind (("C-c n l" . org-roam-buffer-toggle)
+  :bind (("C-c n l" . org-roam-buffer-toggle)
          ("C-c n f" . org-roam-node-find)
          ("C-c n i" . org-roam-node-insert)
          :map org-mode-map
@@ -454,6 +454,42 @@ suitable for （卡片笔记法）
   (require 'org-roam-dailies) ;; Ensure the keymap is available
   (org-roam-db-autosync-mode))
 (setq org-roam-dailies-directory "~/Projects/Notes/journal")
+(setq org-roam-node-display-template "${tags:50} ${title:*}")
+
+;; Config the org-roam-ui for better visuilization. 
+(use-package org-roam-ui
+  :ensure t
+  :after org-roam
+  :bind (("C-c n u" . org-roam-ui-mode))
+  :config
+  (setq org-roam-ui-sync-theme t
+        org-roam-ui-follow t       ;; 图谱跟随 Emacs 中打开的节点
+        org-roam-ui-update-on-save t
+        org-roam-ui-open-on-start t))
+
+(setq minibuffer-visible-completions nil)
+;; Better search performance when the nodes it too much.
+(use-package consult-org-roam
+  :ensure t
+  :after org-roam
+  :init
+  (require 'consult-org-roam)
+  ;; 开启 consult-org-roam 模式
+  (consult-org-roam-mode 1)
+  :bind
+  ("C-c n b" . consult-org-roam-backlinks) ;; 查看当前笔记的反向链接
+  :config
+  ;; Turn off the preview of consult.
+  (with-eval-after-load 'consult
+    (consult-customize
+     org-roam-node-read
+     org-roam-node-find
+     org-roam-node-insert
+     org-roam-capture
+     consult-org-roam-file-find
+     consult-org-roam-search
+     :preview-key nil)))
+
 #+end_src
 
 *** Org-download
@@ -473,32 +509,10 @@ This section contains the package which is used for picture management.
   (setq org-download-image-attr-list
         '("#+ATTR_ORG: :width 400"
           "#+ATTR_HTML: :width 80% :align center"))
-  
-;; Insert annotationg automatically.
-  (setq org-download-annotate-function
-        (lambda (_link)
-          (let ((caption (read-string "Please input the title of image(Press <Enter> if NULL): ")))
-            (if (string-empty-p caption)
-                ""                       ;; Do not insert anything if NULL.
-              (format "#+CAPTION: %s\n" caption))))) ;; Auto insert if has inputs CAPTION
-
-  ;; The format of insert image.
-  (setq org-download-link-format
-	"#+begin_center\n[[file:%s]]\n#+end_center\n")
-
-  ;; Set directory where the image store to. 
-  (defun my-org-download-set-dir ()
-    "Set `org-download-image-dir` to the directory of the current buffer's file."
-    ;; 加入 when 判断，只有在 (buffer-file-name) 不为空时才执行
-    (when (buffer-file-name)
-      (setq-local org-download-image-dir 
-                  (concat (file-name-directory (buffer-file-name)) 
-                          "images/" 
-                          (file-name-base (buffer-file-name)) "/"))))
-  
+  ;; Set the default directory to store images.
+  (setq-default org-download-image-dir "~/Projects/Notes/notes/images") 
   (setq org-download-timestamp "%Y%m%d-%H%M%S_")
-  (setq org-download-method 'directory)
-  (setq org-download-heading-lvl nil)
+  (setq org-download-heading-lvl -1)
   ;; 2. 【核心修复】：临时拦截并屏蔽 org-id-get-create 的执行
   (defun my-org-download-disable-id (orig-fn &rest args)
     (cl-letf (((symbol-function 'org-id-get-create) #'ignore))
@@ -510,10 +524,7 @@ This section contains the package which is used for picture management.
   (advice-add 'org-download-yank :around #'my-org-download-disable-id)
 
   ;; 3. 关掉图片上方那行烦人的 "DOWNLOADED: screenshot @ ..." 注释
-  (setq org-download-annotate-function (lambda (_link) ""))
-  
-  :hook
-  ((org-mode . my-org-download-set-dir)))
+  (setq org-download-annotate-function (lambda (_link) "")))
 
 #+end_src
 
@@ -522,20 +533,25 @@ As follows are the roam capture templates.
 #+begin_src emacs-lisp
 
 (setq org-roam-capture-templates
-   '(("d" "default" plain
-     "%?"
-     :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n")
+   '(
+     ;; Project template, create when start a new project things.
+     ("p" "project" plain "%?"
+     :if-new (file+head "projects/%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+filetags: :Project:")
      :unnarrowed t)
-     ("p" "project" plain "* Goals\n\n%?\n\n* Tasks\n\n** TODO Add initial tasks\n\n* Dates\n\n"
-     :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+filetags: Project")
+     
+     ;; Literature node, create when learning something and do not form my own thoughs.
+     ("l" "literature" plain "%?"
+     :if-new (file+head "reference/%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+filetags: :Literature:")
      :unnarrowed t)
-     ("r" "resource" plain "* Main\n%?\n"
-     :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+filetags: Resource")
-     :unnarrowed t)))
+
+     ;; Zettel(permanent) node, create from fleeting(闪念) and literature nodes. Which is
+     ;; my own thoughs.
+     ("z" "zettel(permanent)" plain "%?"
+     :if-new (file+head "permanent/%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+filetags: :Permanent:")
+     :unnarrowed t)
+     ))
 
 #+end_src
-
-*** Org-roam-dailies-templates
 
 * Development
 :PROPERTIES:
